@@ -521,7 +521,31 @@ def add_forward_record(zone, name, str_address):
 
 def get_reverse_zone(ipaddr, prefixlen=None):
     ip = netaddr.IPAddress(str(ipaddr))
-    revdns = DNSName(unicode(ip.reverse_dns))
+    revdns_name = unicode(ip.reverse_dns)
+
+    resolver = dns.resolver.Resolver()   # this reads /etc/resolv.conf
+    try:
+        try:
+            dns_answer = resolver.query(revdns_name,
+                                        dns.rdatatype.CNAME,
+                                        dns.rdataclass.IN)
+            revdns_name = unicode(dns_answer.canonical_name.to_text())
+            prefixlen = None
+        except dns.resolver.NXDOMAIN as e_nx:
+            try:
+                revdns_name = e_nx.canonical_name   # dnspython 1.12.1
+            except (AttributeError, TypeError):
+                pass
+            else:
+                revdns_name = unicode(revdns_name.to_text())
+                prefixlen = None
+    except (dns.resolver.NXDOMAIN,
+            dns.resolver.YXDOMAIN,
+            dns.resolver.NoAnswer,
+            dns.resolver.NoNameservers,
+            dns.resolver.Timeout) as e:
+        pass
+    revdns = DNSName(revdns_name)
 
     if prefixlen is None:
         revzone = None
